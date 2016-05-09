@@ -22,6 +22,8 @@ The objective of the application is to integrate 3 existing systems(online order
 * The integration application sends the customer information to X (output a CSV file);
 * The integration application returns a message telling if Step#3 and Step4 are successful
 
+## Flowchart
+![Flowchart](https://raw.githubusercontent.com/mattshen/mulesoft-salesforce-showcase/master/docs/flowchart.PNG)
 
 ## Running Instructions
 
