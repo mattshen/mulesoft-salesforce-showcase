@@ -1,0 +1,111 @@
+#%RAML 0.8
+title: Upload Leads service
+version: 1.0.0
+baseUri: http://www.thinkalouds.com/api
+/leads:
+  displayName: Leads
+  post:
+    description: Upload leads
+    body:
+      application/json:
+        example: |
+          {
+            "email": "John.Smith@mail.com",
+            "company": "Think Alouds",
+            "phone": "0287888888",
+            "firstName": "John",
+            "lastName": "Smith",
+            "address1": "116 Miller St",
+            "address2": "",
+            "suburb": "North Sydney",
+            "state": "NSW",
+            "country": "AU",
+            "postalCode": "2060"
+          }
+        schema: |
+          {
+            "type": "object",
+            "$schema": "http://json-schema.org/draft-03/schema",
+            "id": "http://jsonschema.net",
+            "required": true,
+            "properties": {
+                "company": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/company",
+                    "required": true
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "id": "http://jsonschema.net/email",
+                    "required": true
+                },
+                "phone": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/phone",
+                    "required": true
+                },
+                "firstName": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/firstName",
+                    "required": true
+                },
+                "lastName": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/lastName",
+                    "required": false
+                },
+                "address1": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/address1",
+                    "required": false
+                },
+                "address2": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/address2",
+                    "required": false
+                },
+                "state": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/state",
+                    "required": false
+                },
+                "country": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/country",
+                    "required": false
+                },
+                "state": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/state",
+                    "required": false
+                },
+                "postalCode": {
+                    "type": "string",
+                    "id": "http://jsonschema.net/postalCode",
+                    "required": false
+                }
+            }
+          }
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+              {
+                [{
+                  "success": true,
+                  "routeName": "Save CVS file to Disk"
+                }, {
+                    "reason": "Duplicate Alert;",
+                    "success": false,
+                    "routeName": "Upsert Lead to Salesforce"
+                }]
+              }
+      500:
+        body:
+          application/json:
+            example: |
+              {
+                "errorMessage": "System Error"
+              }

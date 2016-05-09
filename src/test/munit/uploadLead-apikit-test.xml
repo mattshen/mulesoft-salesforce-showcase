@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <spring:beans>
+        <spring:import resource="classpath:uploadLead.xml"/>
+    </spring:beans>
+    <munit:config mock-connectors="false" mock-inbounds="false" doc:name="MUnit configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" host="localhost" port="8081" basePath="/api" doc:name="HTTP Request Configuration">
+        <http:basic-authentication username="${http.basic.username}" password="${http.basic.password}"/>
+    </http:request-config>
+    <http:request-config name="HTTP_Request_Configuration1" host="localhost" port="8081" basePath="/api" doc:name="HTTP Request Configuration"/>
+    <munit:test name="post:/leads:application/json:uploadLead-config-200-application/json-FlowTest" description="Verifying functionality of [post:/leads:application/json:uploadLead-config-200-application/json]">
+        <mock:when messageProcessor=".*:.*" doc:name="CVS Output Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Save CSV File to Disk']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Salesforce Upsert Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Salesforce Upsert Lead']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Transform Saleforce Result Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Transform Salesforce Upsert result to custom result']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[['failedReason': 'NA', 'success': true]]"/>
+        </mock:when>
+        <set-payload value="#[getResource('request1.json').asString()]" doc:name="Set Payload"/>
+        <http:request config-ref="HTTP_Request_Configuration" path="/leads" method="POST" doc:name="HTTP">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/json"/>
+            </http:request-builder>
+        </http:request>
+        <object-to-string-transformer doc:name="http response to string"/>
+        <munit:assert-true message="The HTTP Status code is not correct!" condition="#[messageInboundProperty('http.status').is(eq(200))]" doc:name="assert that - http.status eq 200"/>
+        <munit:assert-on-equals message="The response payload is not correct!" expectedValue="#[getResource('response1.json').asString()]" actualValue="#[payload]" doc:name="assert that - payload is as expected"/>
+    </munit:test>
+    <munit:test name="post:/leads:application/json:uploadLead-config-400-application/json-FlowTest" description="Verifying functionality of [post:/leads:application/json:uploadLead-config-400-application/json]" expectException="org.mule.module.http.internal.request.ResponseValidatorException">
+        <mock:when messageProcessor=".*:.*" doc:name="CVS Output Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Save CSV File to Disk']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <set-payload value="{}" doc:name="Set Payload"/>
+        <http:request config-ref="HTTP_Request_Configuration" path="/leads" method="POST" doc:name="HTTP">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/json"/>
+            </http:request-builder>
+        </http:request>
+    </munit:test>
+    <munit:test name="post:/leads:application/json:uploadLead-config-401-application/json-FlowTest" description="Verifying functionality of [post:/leads:application/json:uploadLead-config-401-application/json]" expectException="org.mule.module.http.internal.request.ResponseValidatorException">
+        <mock:when messageProcessor=".*:.*" doc:name="CVS Output Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Save CSV File to Disk']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <set-payload value="{}" doc:name="Set Payload"/>
+        <http:request config-ref="HTTP_Request_Configuration1" path="/leads" method="POST" doc:name="HTTP">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/json"/>
+            </http:request-builder>
+        </http:request>
+    </munit:test>
+    <munit:test name="uploadLead-apikit-test-routingTest" description="Test">
+        <mock:when messageProcessor=".*:.*" doc:name="CVS Output Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Save CSV File to Disk']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                    <mock:invocation-property key="Name" value="#[]"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Salesforce Upsert Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Salesforce Upsert Lead']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Transform Saleforce Result Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Transform Salesforce Upsert result to custom result']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[['failedReason': 'NA', 'success': true]]"/>
+        </mock:when>
+        <set-payload value="#[getResource('request1.json').asString()]" doc:name="Set Payload"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <dw:transform-message metadata:id="b9cf5039-5685-4dd4-a829-717c90621bf4" doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	LastName: payload.lastName,
+	FirstName: payload.firstName,
+	Company: payload.company,
+	Email: payload.email,
+	Phone: payload.phone,
+	Ext_ID__c: payload.email
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <flow-ref name="routing" doc:name="Flow-ref to routing"/>
+        <logger message="*********************** #[payload]" level="INFO" doc:name="Logger"/>
+        <munit:assert-on-equals expectedValue="[{&quot;success&quot;:true,&quot;routeName&quot;:&quot;Save CVS file to Disk&quot;},{&quot;success&quot;:true,&quot;routeName&quot;:&quot;Upsert Lead to Salesforce&quot;}]" actualValue="#[payload]" doc:name="Assert Equals"/>
+    </munit:test>
+</mule>

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" 
+	xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:ss="http://www.springframework.org/schema/security"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/3.1/mule-spring-security.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd">
+
+	<spring:beans>
+		<ss:authentication-manager alias="authenticationManager">
+			<ss:authentication-provider>
+				<ss:user-service id="userService">
+					<ss:user name="${http.basic.username}" password="${http.basic.password}" authorities="ROLE_ADMIN" />
+				</ss:user-service>
+			</ss:authentication-provider>
+		</ss:authentication-manager>
+	</spring:beans>
+
+	<mule-ss:security-manager>
+		<mule-ss:delegate-security-provider name="memory-provider" delegate-ref="authenticationManager" />
+	</mule-ss:security-manager>
+
+	<http:listener-config name="uploadLead-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration" />
+	<apikit:config name="uploadLead-config" raml="uploadLead.raml" consoleEnabled="true" consolePath="console"
+		doc:name="Router" />
+	<sfdc:config name="Salesforce" username="${sfdc.user}" password="${sfdc.password}" securityToken="${sfdc.securityToken}"
+		doc:name="Salesforce">
+		<sfdc:connection-pooling-profile initialisationPolicy="INITIALISE_ONE" exhaustedAction="WHEN_EXHAUSTED_GROW" />
+	</sfdc:config>
+    <flow name="uploadLead-main">
+        <http:listener config-ref="uploadLead-httpListenerConfig" path="/api/*" doc:name="HTTP">
+            <http:response-builder/>
+        </http:listener>
+        <logger message="received payload : #[payload]" level="INFO" doc:name="Logger"/>
+        <expression-filter expression="#[message.inboundProperties.'http.request.uri' != '/favicon.ico']" doc:name="Filter favicon.ico"/>
+        <http:basic-security-filter realm="mule-realm"></http:basic-security-filter>
+        <apikit:router config-ref="uploadLead-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="uploadLead-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
+    </flow>
+	<sub-flow name="routing">
+		<scatter-gather doc:name="Scatter-Gather">
+			<custom-aggregation-strategy class="org.p1.strategy.RouteResultsAggregationStrategy" />
+			<processor-chain>
+				<set-variable variableName="routeName" value="Save CVS file to Disk" doc:name="Set Route Name" />
+				<dw:transform-message metadata:id="709ebf80-54c4-46e9-a186-5c702f67ffce" doc:name="Transform Lead Object to CSV">
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/csv
+---
+[{
+	email: payload.Email,
+	company: payload.Company,
+	phone: payload.Phone,
+	firtName: payload.FirstName,
+	lastName: payload.LastName
+}]]]></dw:set-payload>
+				</dw:transform-message>
+				<file:outbound-endpoint path="${csv.files.folder}" outputPattern="PROSPECTIVE_CUSTOMER_#[server.dateTime.format('yyyyMMdd_HHmmss')].csv"
+					responseTimeout="10000" doc:name="Save CSV File to Disk" />
+				<set-variable variableName="success" value="#[1==1]" doc:name="Mark Success" />
+			</processor-chain>
+			<processor-chain>
+				<set-variable variableName="routeName" value="Upsert Lead to Salesforce" doc:name="Set Route Name" />
+				<sfdc:upsert config-ref="Salesforce" externalIdFieldName="Ext_ID__c" type="Lead" doc:name="Salesforce Upsert Lead">
+					<sfdc:objects ref="#[[payload]]" />
+				</sfdc:upsert>
+                <logger message="Upsert result #[payload]" level="INFO" doc:name="Logger"/>
+                <custom-transformer returnClass="org.p1.transformer.SingUpsertResult" class="org.p1.transformer.SalesforceUpsertResultTransformer" doc:name="Transform Salesforce Upsert result to custom result"/>
+                <logger message="transformed salesforce result: #[payload]" level="INFO" doc:name="Logger"/>
+                <set-variable variableName="success" value="#[payload.success]" doc:name="Mark Success"/>
+                <set-variable variableName="reason" value="#[payload.failedReason]" doc:name="Set Failed Reason"/>
+			</processor-chain>
+		</scatter-gather>
+	</sub-flow>
+
+	<flow name="post:/leads:application/json:uploadLead-config">
+		<dw:transform-message metadata:id="88e8b2df-49b8-4aa1-aee7-4eb9020c58e0" doc:name="Transform JSON to Salesforce Lead">
+			<dw:input-payload doc:sample="json.json" />
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	LastName: payload.lastName,
+	FirstName: payload.firstName,
+	Company: payload.company,
+	Email: payload.email,
+	Phone: payload.phone,
+	Ext_ID__c: payload.email
+}]]></dw:set-payload>
+		</dw:transform-message>
+
+		<logger message="&quot;transformed payload:&quot; + #[[payload]]" level="INFO" doc:name="Logger" />
+		<flow-ref name="routing" doc:name="call subflow routing" />
+		<logger message="routing executing result: #[payload]" level="INFO" doc:name="Logger" />
+
+		<set-payload value="{results: #[payload]}" doc:name="Set JSON Reponse" />
+	</flow>
+
+	<apikit:mapping-exception-strategy name="uploadLead-apiKitGlobalExceptionMapping">
+		<apikit:mapping statusCode="404">
+			<apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+			<set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="405">
+			<apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+			<set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="415">
+			<apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+			<set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="406">
+			<apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+			<set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload" />
+		</apikit:mapping>
+		<apikit:mapping statusCode="400">
+			<apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+			<set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+			<set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; # }" doc:name="Set Payload" />
+		</apikit:mapping>
+        <apikit:mapping statusCode="401">
+            <apikit:exception value="org.mule.api.security.UnauthorisedException"/>
+            <set-property propertyName="Content-Type" value="text/html" doc:name="Property"/>
+            <set-payload value="Unauthorised Access" doc:name="Set Payload"/>
+        </apikit:mapping>
+	</apikit:mapping-exception-strategy>
+</mule>

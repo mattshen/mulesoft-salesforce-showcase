@@ -1,0 +1,16 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "JsonLead"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "Salesforce",
+            "typeId": "Lead"
+        }
+    },
+    "id": "88e8b2df-49b8-4aa1-aee7-4eb9020c58e0",
+    "version": "5.2.0.0"
+}
